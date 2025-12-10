@@ -19,8 +19,7 @@ function M.cycle_merge_conflict_layouts()
 	local Diff3Mixed = lazy.access("diffview.scene.layouts.diff_3_mixed", "Diff3Mixed")
 	local Diff4Mixed = lazy.access("diffview.scene.layouts.diff_4_mixed", "Diff4Mixed")
 
-  -- stylua: ignore
-  local DiffView        = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
+	local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
 
 	local layout_cycle = {
 		Diff3Mixed.__get(),
