@@ -8,6 +8,8 @@ local M = {}
 --[[ ---------------------------------------------------------------------- ]]
 
 ---Cycle between diff3_mixed and diff4_mixed.
+---
+---TODO: Modify so it only attempts to change layouts if resolving a conflict.
 function M.cycle_merge_conflict_layouts()
 	local api = vim.api
 	local lib = require("diffview.lib")
