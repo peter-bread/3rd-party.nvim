@@ -1,6 +1,8 @@
 ---@class thirdparty.diffview
 local M = {}
 
+---@module "diffview"
+
 --[[ ---------------------------------------------------------------------- ]]
 --
 --[[ ------------------- START OF PUBLIC API FUNCTIONS. ------------------- ]]
@@ -8,8 +10,6 @@ local M = {}
 --[[ ---------------------------------------------------------------------- ]]
 
 ---Cycle between diff3_mixed and diff4_mixed.
----
----TODO: Modify so it only attempts to change layouts if resolving a conflict.
 function M.cycle_merge_conflict_layouts()
 	local api = vim.api
 	local lib = require("diffview.lib")
@@ -21,7 +21,6 @@ function M.cycle_merge_conflict_layouts()
 
   -- stylua: ignore
   local DiffView        = lazy.access("diffview.scene.views.diff.diff_view", "DiffView")
-	local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView")
 
 	local layout_cycle = {
 		Diff3Mixed.__get(),
@@ -33,22 +32,20 @@ function M.cycle_merge_conflict_layouts()
 		return
 	end
 
-	local files, cur_file
-
-	if view:instanceof(FileHistoryView.__get()) then
-		---@cast view FileHistoryView
-		files = view.panel:list_files()
-		cur_file = view:cur_file()
-	elseif view:instanceof(DiffView.__get()) then
-		---@cast view DiffView
-		cur_file = view.cur_entry
-		if cur_file then
-			files = cur_file.kind == "conflicting" and view.files.conflicting
-				or utils.vec_join(view.panel.files.working, view.panel.files.staged)
-		end
-	else
+	if not view:instanceof(DiffView.__get()) then
 		return
 	end
+
+	local cur_file = view.cur_entry
+	if not cur_file then
+		return
+	end
+
+	if cur_file.kind ~= "conflicting" then
+		return
+	end
+
+	local files = view.files.conflicting
 
 	-- Cycle layout for all file entries.
 	for _, entry in ipairs(files) do
