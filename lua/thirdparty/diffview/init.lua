@@ -1,3 +1,6 @@
+-- This file contains modified code derived from diffview.nvim.
+-- Original copyright (C) 2021 Sindre T. Strøm. License: GPLv3.
+
 ---@class thirdparty.diffview
 local M = {}
 
