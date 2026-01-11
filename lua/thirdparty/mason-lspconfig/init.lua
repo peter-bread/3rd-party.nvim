@@ -1,6 +1,9 @@
+-- Modified from mason-lspconfig.init and mason-lspconfig.mappings
+-- by Peter Sheehan, 2026.
+
 local M = {}
 
-local function get_mason_map()
+function M.get_mappings()
 	local _ = require("mason-core.functional")
 	local registry = require("mason-registry")
 
@@ -19,9 +22,10 @@ local function get_mason_map()
 	}
 end
 
+-- Ensure aliases can only be registered once.
 local has_run = false
 
-function M.create_mapping()
+function M.register_lspconfig_aliases()
 	if has_run then
 		return
 	end
@@ -30,7 +34,7 @@ function M.create_mapping()
 	local _ = require("mason-core.functional")
 	local registry = require("mason-registry")
 
-	local mapping = get_mason_map()
+	local mapping = M.get_mappings()
 
 	---@diagnostic disable-next-line: unused-local
 	registry.refresh(vim.schedule_wrap(function(success, updated_registries)
@@ -39,30 +43,5 @@ function M.create_mapping()
 		end, mapping.package_to_lspconfig))
 	end))
 end
-
-local function map_name(name)
-	local mapping = get_mason_map()
-	return mapping.lspconfig_to_package[name] or name
-end
-
-local function install(name)
-	local registry = require("mason-registry")
-
-	name = map_name(name)
-	local p = registry.get_package(name)
-
-	vim.schedule(function()
-		p:install()
-	end)
-end
-
-local function install_all(tbl)
-	vim.iter(tbl):each(function(p)
-		install(p)
-	end)
-end
-
--- install_all({ "lua_ls" })
--- install_all({ "lua_ls", "angularls", "awk_ls" })
 
 return M
