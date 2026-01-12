@@ -156,9 +156,35 @@ local function clean()
 	end
 end
 
+---Return the mason names of all packages in `ensure_installed`.
+---@return string[]
+local function get_ensure_installed_names()
+	-- local ret = {}
+
+	local ret = vim.iter(Config.ensure_installed or {})
+		:map(function(p)
+			local name = type(p) == "string" and p or p[1]
+			return map_name(name)
+		end)
+		:totable()
+
+	table.sort(ret)
+
+	return ret
+
+	-- for _, name in ipairs(Config.ensure_installed or {}) do
+	-- 	name = type(name) == "string" and name or name[1]
+	-- 	name = map_name(name)
+	-- 	ret[#ret + 1] = name
+	-- end
+	--
+	-- return ret
+end
+
 -- stylua: ignore
 return {
-  setup         = setup,
-  check_install = check_install,
-  clean         = clean,
+  setup                      = setup,
+  check_install              = check_install,
+  clean                      = clean,
+  get_ensure_installed_names = get_ensure_installed_names,
 }
