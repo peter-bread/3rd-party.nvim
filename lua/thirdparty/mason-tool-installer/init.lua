@@ -3,19 +3,19 @@
 
 local mr = require("mason-registry")
 
----@alias thirdparty.MasonPackageSpec string | { [1]: string, version: string, condition: fun():boolean }
----@alias thirdparty.MasonLogger fun(msg:string, level?:vim.log.levels)
+---@alias thirdparty.MasonToolInstaller.PackageSpec string | { [1]: string, version: string, condition: fun():boolean }
+---@alias thirdparty.MasonToolInstaller.Logger fun(msg:string, level?:vim.log.levels)
 
 ---@type table
 local mappings_cache
 
----@class peter.mason.Config
+---@class thirdparty.MasonToolInstaller.Config
 local Config = {
-	---@type thirdparty.MasonPackageSpec[]
+	---@type thirdparty.MasonToolInstaller.PackageSpec[]
 	ensure_installed = {},
 }
 
----@type thirdparty.MasonLogger
+---@type thirdparty.MasonToolInstaller.Logger
 local _log = function(msg, level)
 	if not vim.g.is_headless then
 		vim.notify(msg, level or vim.log.levels.INFO, { title = "Mason Tool Installer" })
@@ -24,12 +24,12 @@ local _log = function(msg, level)
 	end
 end
 
----@type thirdparty.MasonLogger
+---@type thirdparty.MasonToolInstaller.Logger
 local log_info = vim.schedule_wrap(function(msg)
 	_log(msg)
 end)
 
----@type thirdparty.MasonLogger
+---@type thirdparty.MasonToolInstaller.Logger
 local log_error = vim.schedule_wrap(function(msg)
 	_log(msg, vim.log.levels.ERROR)
 end)
@@ -130,7 +130,7 @@ local function check_install(sync)
 end
 
 ---Setup.
----@param opts peter.mason.Config
+---@param opts thirdparty.MasonToolInstaller.Config
 local function setup(opts)
 	Config = vim.tbl_deep_extend("force", Config, opts or {})
 
@@ -159,8 +159,6 @@ end
 ---Return the mason names of all packages in `ensure_installed`.
 ---@return string[]
 local function get_ensure_installed_names()
-	-- local ret = {}
-
 	local ret = vim.iter(Config.ensure_installed or {})
 		:map(function(p)
 			local name = type(p) == "string" and p or p[1]
@@ -171,14 +169,6 @@ local function get_ensure_installed_names()
 	table.sort(ret)
 
 	return ret
-
-	-- for _, name in ipairs(Config.ensure_installed or {}) do
-	-- 	name = type(name) == "string" and name or name[1]
-	-- 	name = map_name(name)
-	-- 	ret[#ret + 1] = name
-	-- end
-	--
-	-- return ret
 end
 
 -- stylua: ignore
