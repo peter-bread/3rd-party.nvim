@@ -123,7 +123,7 @@ local function check_install(sync)
 	end
 
 	if sync then
-		vim.wait(10000, function()
+		vim.wait(60 * 1000, function()
 			return all_done
 		end)
 	end
