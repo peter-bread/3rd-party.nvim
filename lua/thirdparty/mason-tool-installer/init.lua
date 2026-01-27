@@ -61,8 +61,9 @@ local function install_package(pkg, version, on_done)
 	pkg:install({ version = version })
 end
 
-local function check_install(sync)
+local function check_install(sync, upgrade)
 	sync = sync or false
+	upgrade = upgrade or false
 
 	local total = #Config.ensure_installed
 	if total == 0 then
@@ -105,10 +106,16 @@ local function check_install(sync)
 				name = map_name(name)
 				local pkg = mr.get_package(name)
 
-				if not pkg:is_installed() then
+				local installed = pkg:is_installed()
+				local installed_version = pkg:get_installed_version()
+				local latest_version = pkg:get_latest_version()
+
+				if not installed then
 					install_package(pkg, version, on_done)
-				elseif version and pkg:get_installed_version() ~= version then
+				elseif version and installed_version ~= version then
 					install_package(pkg, version, on_done)
+				elseif upgrade and installed_version ~= latest_version and not version then
+					install_package(pkg, latest_version, on_done) -- could pass in version = nil?
 				else
 					on_done()
 				end
