@@ -61,9 +61,8 @@ local function install_package(pkg, version, on_done)
 	pkg:install({ version = version })
 end
 
-local function check_install(sync, upgrade)
-	sync = sync or false
-	upgrade = upgrade or false
+local function check_install(opts)
+	opts = vim.tbl_deep_extend("force", {}, { sync = false, update = false }, opts or {})
 
 	local total = #Config.ensure_installed
 	if total == 0 then
@@ -114,7 +113,7 @@ local function check_install(sync, upgrade)
 					install_package(pkg, version, on_done)
 				elseif version and installed_version ~= version then
 					install_package(pkg, version, on_done)
-				elseif upgrade and installed_version ~= latest_version and not version then
+				elseif opts.update and installed_version ~= latest_version and not version then
 					install_package(pkg, latest_version, on_done) -- could pass in version = nil?
 				else
 					on_done()
@@ -129,7 +128,7 @@ local function check_install(sync, upgrade)
 		run()
 	end
 
-	if sync then
+	if opts.sync then
 		vim.wait(60 * 1000, function()
 			return all_done
 		end)
