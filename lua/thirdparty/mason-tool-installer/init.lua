@@ -5,7 +5,10 @@
 
 ---@module "mason"
 
-local mr = require("mason-registry")
+---@class thirdparty.mti
+local M = {}
+
+local H = {}
 
 ---@alias thirdparty.mti.PackageInstallOptsExtensions
 ---| { condition: fun():boolean }
@@ -26,6 +29,14 @@ local mr = require("mason-registry")
 
 ---@alias thirdparty.mti.Logger fun(msg:string, level?:vim.log.levels)
 
+--[[ ---------------------------------------------------------------------- ]]
+--
+--[[ ------------------- START OF PUBLIC API FUNCTIONS. ------------------- ]]
+--
+--[[ ---------------------------------------------------------------------- ]]
+
+local mr = require("mason-registry")
+
 ---@type table
 local mappings_cache
 
@@ -35,72 +46,7 @@ local Config = {
   ensure_installed = {},
 }
 
----@type thirdparty.mti.Logger
-local _log = function(msg, level)
-  if not vim.g.is_headless then
-    vim.notify(
-      msg,
-      level or vim.log.levels.INFO,
-      { title = "Mason Tool Installer" }
-    )
-  else
-    vim.api.nvim_echo({ { msg }, { "\n" } }, false, {})
-  end
-end
-
----@type thirdparty.mti.Logger
-local log_info = vim.schedule_wrap(function(msg)
-  _log(msg)
-end)
-
----@type thirdparty.mti.Logger
-local log_error = vim.schedule_wrap(function(msg)
-  _log(msg, vim.log.levels.ERROR)
-end)
-
-local function map_name(name)
-  if not mappings_cache then
-    mappings_cache = require("thirdparty.mason-lspconfig").get_mappings()
-  end
-  return mappings_cache.lspconfig_to_package[name] or name
-end
-
----Install a mason package.
----@param pkg Package
----@param opts any
----@param on_done any
-local function install_package(pkg, opts, on_done)
-  local version = opts.version
-  if version then
-    log_info(string.format("%s: installing %s", pkg.name, version))
-  else
-    log_info(string.format("%s: installing", pkg.name))
-  end
-
-  pkg:once("install:success", function()
-    log_info(string.format("%s: installed", pkg.name))
-    on_done()
-  end)
-
-  pkg:once("install:failed", function()
-    log_error(string.format("%s: failed to install", pkg.name))
-    on_done()
-  end)
-
-  if not pkg:is_installable() then
-    -- TODO: Log.
-    return
-  end
-
-  if pkg:is_installing() then
-    -- TODO: Log.
-    return
-  end
-
-  pkg:install(opts)
-end
-
-local function check_install(opts)
+function M.check_install(opts)
   opts = vim.tbl_deep_extend(
     "force",
     {},
@@ -154,7 +100,7 @@ local function check_install(opts)
         -- TODO: Provide an arg to say this package was skipped.
         on_done()
       else
-        name = map_name(name)
+        name = H.map_name(name)
         local pkg = mr.get_package(name)
 
         local is_installed = pkg:is_installed()
@@ -171,7 +117,7 @@ local function check_install(opts)
         end
 
         if needs_install then
-          install_package(pkg, install_opts, on_done)
+          H.install_package(pkg, install_opts, on_done)
         else
           on_done()
         end
@@ -194,7 +140,7 @@ end
 
 ---Setup.
 ---@param opts thirdparty.mti.Config
-local function setup(opts)
+function M.setup(opts)
   Config = vim.tbl_deep_extend("force", Config, opts or {})
 
   vim.validate({
@@ -202,18 +148,18 @@ local function setup(opts)
   })
 end
 
-local function clean()
+function M.clean()
   local expected = {}
 
   for _, item in ipairs(Config.ensure_installed or {}) do
     local name = type(item) == "table" and item[1] or item
-    name = map_name(name)
+    name = H.map_name(name)
     expected[name] = true
   end
 
   for _, name in ipairs(mr.get_all_package_names()) do
     if mr.is_installed(name) and not expected[name] then
-      log_info(string.format("%s: uninstalling", name))
+      H.log_info(string.format("%s: uninstalling", name))
       mr.get_package(name):uninstall()
     end
   end
@@ -221,12 +167,12 @@ end
 
 ---Return the mason names of all packages in `ensure_installed`.
 ---@return string[]
-local function get_ensure_installed_names()
+function M.get_ensure_installed_names()
   local ret = vim
     .iter(Config.ensure_installed or {})
     :map(function(p)
       local name = type(p) == "string" and p or p[1]
-      return map_name(name)
+      return H.map_name(name)
     end)
     :totable()
 
@@ -235,10 +181,75 @@ local function get_ensure_installed_names()
   return ret
 end
 
--- stylua: ignore
-return {
-  setup                      = setup,
-  check_install              = check_install,
-  clean                      = clean,
-  get_ensure_installed_names = get_ensure_installed_names,
-}
+--[[ ---------------------------------------------------------------------- ]]
+--
+--[[ ---------- END OF API FUNCTIONS. START OF HELPER FUNCTIONS. ---------- ]]
+--
+--[[ ---------------------------------------------------------------------- ]]
+
+---@type thirdparty.mti.Logger
+H.log = function(msg, level)
+  if not vim.g.is_headless then
+    vim.notify(
+      msg,
+      level or vim.log.levels.INFO,
+      { title = "Mason Tool Installer" }
+    )
+  else
+    vim.api.nvim_echo({ { msg }, { "\n" } }, false, {})
+  end
+end
+
+---@type thirdparty.mti.Logger
+H.log_info = vim.schedule_wrap(function(msg)
+  H.log(msg)
+end)
+
+---@type thirdparty.mti.Logger
+H.log_error = vim.schedule_wrap(function(msg)
+  H.log(msg, vim.log.levels.ERROR)
+end)
+
+function H.map_name(name)
+  if not mappings_cache then
+    mappings_cache = require("thirdparty.mason-lspconfig").get_mappings()
+  end
+  return mappings_cache.lspconfig_to_package[name] or name
+end
+
+---Install a mason package.
+---@param pkg Package
+---@param opts any
+---@param on_done any
+function H.install_package(pkg, opts, on_done)
+  local version = opts.version
+  if version then
+    H.log_info(string.format("%s: installing %s", pkg.name, version))
+  else
+    H.log_info(string.format("%s: installing", pkg.name))
+  end
+
+  pkg:once("install:success", function()
+    H.log_info(string.format("%s: installed", pkg.name))
+    on_done()
+  end)
+
+  pkg:once("install:failed", function()
+    H.log_error(string.format("%s: failed to install", pkg.name))
+    on_done()
+  end)
+
+  if not pkg:is_installable() then
+    -- TODO: Log.
+    return
+  end
+
+  if pkg:is_installing() then
+    -- TODO: Log.
+    return
+  end
+
+  pkg:install(opts)
+end
+
+return M
