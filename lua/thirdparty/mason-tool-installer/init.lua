@@ -2,6 +2,8 @@
 -- by Peter Sheehan, 2026.
 
 -- TODO: Allow vim.g.thirdparty_mti_config instead of setup().
+-- TODO: Create a state class to use with on_done().
+-- TODO: Ensure consistent logging messages.
 
 ---@module "mason"
 
