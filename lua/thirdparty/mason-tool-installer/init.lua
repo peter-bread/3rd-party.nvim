@@ -228,7 +228,10 @@ end
 
 ---@type thirdparty.mti.Logger
 H.log = function(msg, level)
-  if not vim.g.is_headless then
+  local is_headless = vim.g.is_headless ~= nil and #vim.api.nvim_list_uis() == 0
+    or vim.g.is_headless
+
+  if not is_headless then
     vim.notify(
       msg,
       level or vim.log.levels.INFO,
