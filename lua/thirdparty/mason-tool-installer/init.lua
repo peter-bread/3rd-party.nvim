@@ -2,7 +2,6 @@
 -- by Peter Sheehan, 2026.
 
 -- TODO: Allow vim.g.thirdparty_mti_config instead of setup().
--- TODO: Create a state class to use with on_done().
 -- TODO: Ensure consistent logging messages.
 
 ---@module "mason"
@@ -36,6 +35,95 @@ local H = {}
 --[[ ------------------- START OF PUBLIC API FUNCTIONS. ------------------- ]]
 --
 --[[ ---------------------------------------------------------------------- ]]
+
+---@alias thirdparty.mti.PkgStatus
+---| "SUCCESS"
+---| "SKIPPED"
+---| "FAILED"
+
+---@class thirdparty.mti.PkgState
+---@field name string
+---@field status thirdparty.mti.PkgStatus
+
+---@class thirdparty.mti.State
+---@field all_done boolean
+---@field total integer
+---@field completed integer
+---@field pkg_states thirdparty.mti.PkgState[]
+---@field _by_name table<string, thirdparty.mti.PkgState>
+---@field on_complete fun(state: thirdparty.mti.State)?
+local State = {}
+State.__index = State
+
+---@param total integer
+---@return thirdparty.mti.State
+function State.new(total)
+  return setmetatable({
+    all_done = false,
+    total = total,
+    completed = 0,
+    pkg_states = {},
+    _by_name = {},
+    on_complete = nil,
+  }, State)
+end
+
+---@param name string
+---@param status thirdparty.mti.PkgStatus
+function State:report(name, status)
+  local pkg_state = self._by_name[name]
+
+  if not pkg_state then
+    pkg_state = {
+      name = name,
+      status = status,
+    }
+    self._by_name[name] = pkg_state
+    table.insert(self.pkg_states, pkg_state)
+  else
+    pkg_state.status = status
+  end
+
+  self.completed = self.completed + 1
+  if self.completed >= self.total then
+    self.all_done = true
+    if self.on_complete then
+      self:on_complete()
+    end
+  end
+end
+
+---@class thirdparty.mti.StateSummary
+---@field total integer
+---@field completed integer
+---@field success integer
+---@field skipped integer
+---@field failed integer
+---@field all_done boolean
+
+---@return thirdparty.mti.StateSummary
+function State:summary()
+  local summary = {
+    total = self.total,
+    completed = self.completed,
+    success = 0,
+    skipped = 0,
+    failed = 0,
+    all_done = self.all_done,
+  }
+
+  for _, pkg in ipairs(self.pkg_states) do
+    if pkg.status == "SUCCESS" then
+      summary.success = summary.success + 1
+    elseif pkg.status == "SKIPPED" then
+      summary.skipped = summary.skipped + 1
+    elseif pkg.status == "FAILED" then
+      summary.failed = summary.failed + 1
+    end
+  end
+
+  return summary
+end
 
 local mr = require("mason-registry")
 
@@ -121,14 +209,20 @@ function M.check_install(opts)
     return
   end
 
-  local completed = 0
-  local all_done = false
+  local state = State.new(total)
+  state.on_complete = function(s)
+    local summary = s:summary()
 
-  local function on_done()
-    completed = completed + 1
-    if completed >= total then
-      all_done = true
-    end
+    H.log_info(
+      string.format(
+        "Done (%d/%d): %d success, %d skipped, %d failed",
+        summary.completed,
+        summary.total,
+        summary.success,
+        summary.skipped,
+        summary.failed
+      )
+    )
   end
 
   ---Attempt to install a single package.
@@ -138,7 +232,7 @@ function M.check_install(opts)
 
     if condition and not condition() then
       -- TODO: Maybe pass arg to on_done to report state.
-      on_done()
+      state:report(name, "SKIPPED")
       return
     end
 
@@ -146,14 +240,16 @@ function M.check_install(opts)
     if not found then
       -- TODO: Maybe pass arg to on_done to report state.
       H.log_error(string.format("Could not find package: %s", name))
-      on_done()
+      state:report(name, "FAILED")
       return
     end
 
     if needs_install(pkg, install_opts.version, opts.update) then
-      H.install_package(pkg, install_opts, on_done)
+      H.install_package(pkg, install_opts, function(status)
+        state:report(name, status)
+      end)
     else
-      on_done()
+      state:report(name, "SKIPPED")
     end
   end
 
@@ -171,7 +267,7 @@ function M.check_install(opts)
 
   if opts.sync then
     vim.wait(60 * 1000, function()
-      return all_done
+      return state.all_done
     end)
   end
 end
@@ -261,9 +357,9 @@ end
 
 ---Install a mason package.
 ---@param pkg Package
----@param opts any
----@param on_done function
-function H.install_package(pkg, opts, on_done)
+---@param opts PackageInstallOpts
+---@param report fun(status: thirdparty.mti.PkgStatus)
+function H.install_package(pkg, opts, report)
   local version = opts.version
   if version then
     H.log_info(string.format("%s: installing %s", pkg.name, version))
@@ -273,21 +369,21 @@ function H.install_package(pkg, opts, on_done)
 
   pkg:once("install:success", function()
     H.log_info(string.format("%s: installed", pkg.name))
-    on_done()
+    report("SUCCESS")
   end)
 
   pkg:once("install:failed", function()
     H.log_error(string.format("%s: failed to install", pkg.name))
-    on_done()
+    report("FAILED")
   end)
 
   if not pkg:is_installable() then
-    -- TODO: Log.
+    report("FAILED")
     return
   end
 
   if pkg:is_installing() then
-    -- TODO: Log.
+    report("FAILED")
     return
   end
 
