@@ -46,6 +46,66 @@ local Config = {
   ensure_installed = {},
 }
 
+local VALID_INSTALL_OPTS = {
+  debug = true,
+  force = true,
+  location = true,
+  strict = true,
+  target = true,
+  version = true,
+}
+
+---@param item thirdparty.mti.PkgEntry
+---@return PackageInstallOpts
+local function extract_install_opts(item)
+  local opts = {}
+  if type(item) ~= "table" then
+    return opts
+  end
+
+  for k, v in pairs(item) do
+    if VALID_INSTALL_OPTS[k] then
+      opts[k] = v
+    end
+  end
+
+  return opts
+end
+
+---@param item thirdparty.mti.PkgEntry
+---@return string name The name of the package.
+---@return (fun():boolean)? condition Condition function.
+---@return PackageInstallOpts install_opts Mason package install options.
+local function normalise_spec(item)
+  if type(item) == "table" then
+    return H.map_name(item[1]), item.condition, extract_install_opts(item)
+  end
+
+  return H.map_name(item), nil, {}
+end
+
+---@param pkg Package
+---@param version? string
+---@param update boolean
+---@return boolean should_install
+local function needs_install(pkg, version, update)
+  if not pkg:is_installed() then
+    return true
+  end
+
+  local installed_version = pkg:get_installed_version()
+
+  if version then
+    return installed_version ~= version
+  end
+
+  if update then
+    return installed_version ~= pkg:get_latest_version()
+  end
+
+  return false
+end
+
 function M.check_install(opts)
   opts = vim.tbl_deep_extend(
     "force",
@@ -66,62 +126,38 @@ function M.check_install(opts)
     completed = completed + 1
     if completed >= total then
       all_done = true
-      -- vim.api.nvim_exec_autocmds("User", {
-      --   pattern = "MasonForgeUpdateCompleted",
-      --   data = vim.tbl_map(function(item)
-      --     return type(item) == "table" and item[1] or item
-      --   end, Config.ensure_installed),
-      -- })
+    end
+  end
+
+  ---Attempt to install a single package.
+  ---@param item thirdparty.mti.PkgEntry
+  local function run_single(item)
+    local name, condition, install_opts = normalise_spec(item)
+
+    if condition and not condition() then
+      -- TODO: Maybe pass arg to on_done to report state.
+      on_done()
+      return
+    end
+
+    local found, pkg = pcall(mr.get_package, name)
+    if not found then
+      -- TODO: Maybe pass arg to on_done to report state.
+      H.log_error(string.format("Could not find package: %s", name))
+      on_done()
+      return
+    end
+
+    if needs_install(pkg, install_opts.version, opts.update) then
+      H.install_package(pkg, install_opts, on_done)
+    else
+      on_done()
     end
   end
 
   local function run()
     for _, item in ipairs(Config.ensure_installed) do
-      ---@type PackageInstallOpts
-      local install_opts = {}
-
-      local name
-      local condition
-
-      if type(item) == "table" then
-        name = item[1]
-        condition = item.condition
-      else
-        name = item
-      end
-
-      local valid =
-        { "debug", "force", "location", "strict", "target", "version" }
-      for _, key in ipairs(valid) do
-        install_opts[key] = item[key]
-      end
-
-      if condition and not condition() then
-        -- TODO: Provide an arg to say this package was skipped.
-        on_done()
-      else
-        name = H.map_name(name)
-        local pkg = mr.get_package(name)
-
-        local is_installed = pkg:is_installed()
-        local installed_version = pkg:get_installed_version()
-        local latest_version = pkg:get_latest_version()
-
-        local needs_install = false
-        if not is_installed then
-          needs_install = true
-        elseif install_opts.version then
-          needs_install = installed_version ~= install_opts.version
-        elseif opts.update then
-          needs_install = installed_version ~= latest_version
-        end
-
-        if needs_install then
-          H.install_package(pkg, install_opts, on_done)
-        else
-          on_done()
-        end
-      end
+      run_single(item)
     end
   end
 
@@ -168,6 +204,7 @@ end
 ---Return the mason names of all packages in `ensure_installed`.
 ---@return string[]
 function M.get_ensure_installed_names()
+  -- TODO: Make sure requested packages actually exist in the mason registry.
   local ret = vim
     .iter(Config.ensure_installed or {})
     :map(function(p)
@@ -220,7 +257,7 @@ end
 ---Install a mason package.
 ---@param pkg Package
 ---@param opts any
----@param on_done any
+---@param on_done function
 function H.install_package(pkg, opts, on_done)
   local version = opts.version
   if version then
