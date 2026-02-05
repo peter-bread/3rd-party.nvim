@@ -44,6 +44,7 @@ local H = {}
 ---@class thirdparty.mti.PkgState
 ---@field name string
 ---@field status thirdparty.mti.PkgStatus
+---@field reason? string
 
 ---@class thirdparty.mti.State
 ---@field all_done boolean
@@ -70,18 +71,21 @@ end
 
 ---@param name string
 ---@param status thirdparty.mti.PkgStatus
-function State:report(name, status)
+---@param reason? string
+function State:report(name, status, reason)
   local pkg_state = self._by_name[name]
 
   if not pkg_state then
     pkg_state = {
       name = name,
       status = status,
+      reason = reason,
     }
     self._by_name[name] = pkg_state
     table.insert(self.pkg_states, pkg_state)
   else
     pkg_state.status = status
+    pkg_state.reason = reason
   end
 
   self.completed = self.completed + 1
@@ -196,6 +200,22 @@ local function needs_install(pkg, version, update)
   return false
 end
 
+---@return { name: string, reason: string }[]
+function State:failures()
+  local ret = {}
+
+  for _, pkg in ipairs(self.pkg_states) do
+    if pkg.status == "FAILED" then
+      table.insert(ret, {
+        name = pkg.name,
+        reason = pkg.reason or "unknown",
+      })
+    end
+  end
+
+  return ret
+end
+
 function M.check_install(opts)
   opts = vim.tbl_deep_extend(
     "force",
@@ -212,6 +232,12 @@ function M.check_install(opts)
   local state = State.new(total)
   state.on_complete = function(s)
     local summary = s:summary()
+
+    if summary.failed > 0 then
+      for _, f in ipairs(s:failures()) do
+        H.log_error(string.format("%s: %s", f.name, f.reason))
+      end
+    end
 
     H.log_info(
       string.format(
@@ -231,25 +257,24 @@ function M.check_install(opts)
     local name, condition, install_opts = normalise_spec(item)
 
     if condition and not condition() then
-      -- TODO: Maybe pass arg to on_done to report state.
-      state:report(name, "SKIPPED")
+      state:report(name, "SKIPPED", "condtion function returned false")
       return
     end
 
     local found, pkg = pcall(mr.get_package, name)
     if not found then
       -- TODO: Maybe pass arg to on_done to report state.
-      H.log_error(string.format("Could not find package: %s", name))
-      state:report(name, "FAILED")
+      -- H.log_error(string.format("Could not find package: %s", name))
+      state:report(name, "FAILED", "package not in registry")
       return
     end
 
     if needs_install(pkg, install_opts.version, opts.update) then
-      H.install_package(pkg, install_opts, function(status)
-        state:report(name, status)
+      H.install_package(pkg, install_opts, function(status, reason)
+        state:report(name, status, reason)
       end)
     else
-      state:report(name, "SKIPPED")
+      state:report(name, "SKIPPED", "already installed")
     end
   end
 
@@ -358,7 +383,7 @@ end
 ---Install a mason package.
 ---@param pkg Package
 ---@param opts PackageInstallOpts
----@param report fun(status: thirdparty.mti.PkgStatus)
+---@param report fun(status: thirdparty.mti.PkgStatus, reason?:string)
 function H.install_package(pkg, opts, report)
   local version = opts.version
   if version then
@@ -378,12 +403,12 @@ function H.install_package(pkg, opts, report)
   end)
 
   if not pkg:is_installable() then
-    report("FAILED")
+    report("FAILED", "not installable")
     return
   end
 
   if pkg:is_installing() then
-    report("FAILED")
+    report("FAILED", "already installing")
     return
   end
 
