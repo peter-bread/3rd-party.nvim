@@ -119,7 +119,14 @@ function M.check_install(opts)
       end
     end
 
-    -- TODO: Only show summary in headless or if a user command is explicitly used.
+    -- TODO: Summary should be shown regardless of state if invoked via user
+    -- command.
+    --
+    -- Only show summary if not headless or at least one package was not skipped,
+    -- i.e. there is at least one success or one fail.
+    if not (is_headless or summary.skipped < summary.completed) then
+      return
+    end
 
     Log.info(
       string.format(
