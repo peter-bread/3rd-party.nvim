@@ -16,7 +16,6 @@
 ---@field _by_name table<string, thirdparty.mti.PkgState>
 ---@field on_complete fun(state: thirdparty.mti.State)?
 local State = {}
-State.__index = State
 
 ---@param total integer
 ---@return thirdparty.mti.State
@@ -28,7 +27,7 @@ function State.new(total)
     pkg_states = {},
     _by_name = {},
     on_complete = nil,
-  }, State)
+  }, { __index = State })
 end
 
 ---@param name string
