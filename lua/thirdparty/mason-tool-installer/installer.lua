@@ -113,11 +113,11 @@ function M.check_install(opts)
   state.on_complete = function(self)
     local summary = self:summary()
 
-    if summary.failed > 0 then
-      for _, f in ipairs(self:failures()) do
-        Log.error(string.format("%s: %s", f.name, f.reason))
-      end
-    end
+    -- if summary.failed > 0 then
+    --   for _, f in ipairs(self:failures()) do
+    --     Log.error(string.format("%s: %s", f.name, f.reason))
+    --   end
+    -- end
 
     -- TODO: Summary should be shown regardless of state if invoked via user
     -- command.
