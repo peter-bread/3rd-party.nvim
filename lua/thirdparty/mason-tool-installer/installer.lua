@@ -249,11 +249,13 @@ function H.install_package(pkg, opts, report)
     report("FAILED")
   end)
 
+  -- FIXME: This doesn't seem to do anything.
   if not pkg:is_installable() then
     report("FAILED", "not installable")
     return
   end
 
+  -- FIXME: This doesn't seem to do anything.
   if pkg:is_installing() then
     report("FAILED", "already installing")
     return
