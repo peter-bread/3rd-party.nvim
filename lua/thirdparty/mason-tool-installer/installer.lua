@@ -5,7 +5,7 @@ local Config = require("thirdparty.mason-tool-installer.config").get()
 local mr = require("mason-registry")
 
 ---@alias thirdparty.mti.PackageInstallOptsExtensions
----| { condition: fun():boolean }
+---| { condition?: fun():boolean }
 
 ---@alias thirdparty.mti.PkgOpts
 ---| PackageInstallOpts Mason package install options.
