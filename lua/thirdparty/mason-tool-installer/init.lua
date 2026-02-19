@@ -10,12 +10,12 @@
 local M = {}
 
 ---Setup.
----@param opts thirdparty.mti.Config
+---@param opts? thirdparty.mti.Config
 M.setup = function(opts)
   return require("thirdparty.mason-tool-installer.config").setup(opts)
 end
 
----@param opts thirdparty.mti.check-install.Opts
+---@param opts? thirdparty.mti.check-install.Opts
 M.check_install = function(opts)
   -- stylua: ignore
   return require("thirdparty.mason-tool-installer.installer").check_install(opts)

@@ -11,7 +11,7 @@ function M.get()
 end
 
 ---Setup.
----@param opts thirdparty.mti.Config
+---@param opts? thirdparty.mti.Config
 function M.setup(opts)
   Config = vim.tbl_deep_extend("force", Config, opts or {})
 

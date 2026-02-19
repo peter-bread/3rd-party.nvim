@@ -95,7 +95,7 @@ local function needs_install(pkg, version, update)
 end
 
 ---Install/update requested packages if necessary.
----@param opts thirdparty.mti.check-install.Opts
+---@param opts? thirdparty.mti.check-install.Opts
 function M.check_install(opts)
   opts = vim.tbl_deep_extend(
     "force",
