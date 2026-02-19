@@ -146,7 +146,7 @@ function M.check_install(opts)
     local name, condition, install_opts = normalise_spec(item)
 
     if condition and not condition() then
-      state:report(name, "SKIPPED", "condtion function returned false")
+      state:report(name, "SKIPPED", "condition function returned false")
       return
     end
 
